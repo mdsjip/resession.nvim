@@ -1,4 +1,6 @@
-local M = {}
+local M = {
+  tab_sessions = {},
+}
 
 -- TODO remove after https://github.com/folke/neodev.nvim/pull/163 lands
 ---@diagnostic disable: inject-field
@@ -8,7 +10,6 @@ local uv = vim.uv or vim.loop
 local has_setup = false
 local pending_config
 local current_session
-local tab_sessions = {}
 local session_configs = {}
 local hooks = setmetatable({
   pre_load = {},
@@ -80,7 +81,7 @@ end
 ---@return string?
 M.get_current = function()
   local tabpage = vim.api.nvim_get_current_tabpage()
-  return tab_sessions[tabpage] or current_session
+  return M.tab_sessions[tabpage] or current_session
 end
 
 ---Get information about the current session
@@ -94,7 +95,7 @@ M.get_current_session_info = function()
   return {
     name = session,
     dir = save_dir,
-    tab_scoped = tab_sessions[vim.api.nvim_get_current_tabpage()] ~= nil,
+    tab_scoped = M.tab_sessions[vim.api.nvim_get_current_tabpage()] ~= nil,
   }
 end
 
@@ -102,7 +103,7 @@ end
 M.detach = function()
   current_session = nil
   local tabpage = vim.api.nvim_get_current_tabpage()
-  tab_sessions[tabpage] = nil
+  M.tab_sessions[tabpage] = nil
 end
 
 ---List all available saved sessions
@@ -160,9 +161,9 @@ M.list = function(opts)
 end
 
 local function remove_tabpage_session(name)
-  for k, v in pairs(tab_sessions) do
+  for k, v in pairs(M.tab_sessions) do
     if v == name then
-      tab_sessions[k] = nil
+      M.tab_sessions[k] = nil
       break
     end
   end
@@ -316,7 +317,7 @@ M.save = function(name, opts)
     return
   end
   save(name, opts)
-  tab_sessions = {}
+  M.tab_sessions = {}
   if opts.attach then
     current_session = name
   else
@@ -334,7 +335,7 @@ M.save_tab = function(name, opts)
   })
   local cur_tabpage = vim.api.nvim_get_current_tabpage()
   if not name then
-    name = tab_sessions[cur_tabpage]
+    name = M.tab_sessions[cur_tabpage]
   end
   if not name then
     vim.ui.input({ prompt = "Session name" }, function(selected)
@@ -348,9 +349,9 @@ M.save_tab = function(name, opts)
   current_session = nil
   remove_tabpage_session(name)
   if opts.attach then
-    tab_sessions[cur_tabpage] = name
+    M.tab_sessions[cur_tabpage] = name
   else
-    tab_sessions[cur_tabpage] = nil
+    M.tab_sessions[cur_tabpage] = nil
   end
 end
 
@@ -366,12 +367,12 @@ M.save_all = function(opts)
     -- First prune tab-scoped sessions for closed tabs
     local invalid_tabpages = vim.tbl_filter(function(tabpage)
       return not vim.api.nvim_tabpage_is_valid(tabpage)
-    end, vim.tbl_keys(tab_sessions))
+    end, vim.tbl_keys(M.tab_sessions))
     for _, tabpage in ipairs(invalid_tabpages) do
-      tab_sessions[tabpage] = nil
+      M.tab_sessions[tabpage] = nil
     end
     -- Save all tab-scoped sessions
-    for tabpage, name in pairs(tab_sessions) do
+    for tabpage, name in pairs(M.tab_sessions) do
       save(name, vim.tbl_extend("keep", opts, session_configs[name]), tabpage)
     end
   end
@@ -590,12 +591,12 @@ M.load = function(name, opts)
 
   current_session = nil
   if opts.reset then
-    tab_sessions = {}
+    M.tab_sessions = {}
   end
   remove_tabpage_session(name)
   if opts.attach then
     if data.tab_scoped then
-      tab_sessions[vim.api.nvim_get_current_tabpage()] = name
+      M.tab_sessions[vim.api.nvim_get_current_tabpage()] = name
     else
       current_session = name
     end
