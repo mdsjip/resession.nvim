@@ -43,6 +43,8 @@ local default_config = {
   extensions = {
     quickfix = {},
   },
+  -- string or a function that returns tab name
+  tab_name = nil,
 }
 
 local autosave_timer

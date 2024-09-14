@@ -227,6 +227,19 @@ local function save(name, opts, target_tabpage)
       options = target_tabpage and {} or util.save_global_options(),
     },
   }
+  if target_tabpage then
+    local final_tab_name = nil
+    local tab_name = config.tab_name
+    if type(tab_name) == "string" then
+      final_tab_name = tab_name
+    end
+    if type(tab_name) == "function" then
+      final_tab_name = tab_name({ name = name, cwd = vim.fn.getcwd(-1, 0) })
+    end
+    if final_tab_name then
+      data = vim.tbl_deep_extend("force", data, { tab_name = final_tab_name })
+    end
+  end
   local current_win = vim.api.nvim_get_current_win()
   local tabpage_bufs = {}
   if target_tabpage then
@@ -258,6 +271,17 @@ local function save(name, opts, target_tabpage)
     local tabnr = vim.api.nvim_tabpage_get_number(tabpage)
     if target_tabpage or vim.fn.haslocaldir(-1, tabnr) == 1 then
       tab.cwd = vim.fn.getcwd(-1, tabnr)
+      local final_tab_name = nil
+      local tab_name = config.tab_name
+      if type(tab_name) == "string" then
+        final_tab_name = tab_name
+      end
+      if type(tab_name) == "function" then
+        final_tab_name = tab_name({ name = name, cwd = tab.cwd })
+      end
+      if final_tab_name then
+        tab.name = final_tab_name
+      end
     end
     tab.options = util.save_tab_options(tabpage)
     table.insert(data.tabs, tab)
@@ -487,6 +511,11 @@ M.load = function(name, opts)
   else
     open_clean_tab()
   end
+
+  if data.tab_scoped and data.tab_name then
+    vim.api.nvim_tabpage_set_var(vim.api.nvim_get_current_tabpage(), "name", data.tab_name)
+  end
+
   -- Don't trigger autocmds during session load
   local eventignore = vim.o.eventignore
   vim.o.eventignore = "all"
@@ -559,6 +588,9 @@ M.load = function(name, opts)
     end
     if tab.cwd then
       vim.cmd.tcd({ args = { tab.cwd } })
+    end
+    if tab.name then
+      vim.api.nvim_tabpage_set_var(vim.api.nvim_get_current_tabpage(), "name", tab.name)
     end
     local win = layout.set_winlayout(tab.wins, scale)
     if win then
