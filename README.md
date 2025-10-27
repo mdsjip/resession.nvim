@@ -147,8 +147,8 @@ Load a dir-specific session when you open Neovim, save it when you exit.
 ```lua
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = function()
-    -- Only load the session if nvim was started with no args
-    if vim.fn.argc(-1) == 0 then
+    -- Only load the session if nvim was started with no args and without reading from stdin
+    if vim.fn.argc(-1) == 0 and not vim.g.using_stdin then
       -- Save these to a different directory, so our manual sessions don't get polluted
       resession.load(vim.fn.getcwd(), { dir = "dirsession", silence_errors = true })
     end
@@ -158,6 +158,12 @@ vim.api.nvim_create_autocmd("VimEnter", {
 vim.api.nvim_create_autocmd("VimLeavePre", {
   callback = function()
     resession.save(vim.fn.getcwd(), { dir = "dirsession", notify = false })
+  end,
+})
+vim.api.nvim_create_autocmd('StdinReadPre', {
+  callback = function()
+    -- Store this for later
+    vim.g.using_stdin = true
   end,
 })
 ```
@@ -255,7 +261,7 @@ end
 ---@param bufnr integer
 ---@return boolean
 M.is_win_supported = function(winid, bufnr)
-  return true
+  return false
 end
 
 ---Save data for a window
@@ -406,71 +412,72 @@ Detach from the current session
 `list(opts): string[]` \
 List all available saved sessions
 
-| Param | Type                      | Desc          |                                                  |
-| ----- | ------------------------- | ------------- | ------------------------------------------------ |
-| opts  | `nil\|resession.ListOpts` |               |                                                  |
-|       | dir                       | `nil\|string` | Name of directory to list (overrides config.dir) |
+| Param | Type                      | Desc                                             |
+| ----- | ------------------------- | ------------------------------------------------ |
+| opts  | `nil\|resession.ListOpts` |                                                  |
+| >dir  | `nil\|string`             | Name of directory to list (overrides config.dir) |
 
 ### delete(name, opts)
 
 `delete(name, opts)` \
 Delete a saved session
 
-| Param | Type                        | Desc                                          |                                                         |
-| ----- | --------------------------- | --------------------------------------------- | ------------------------------------------------------- |
-| name  | `nil\|string`               | If not provided, prompt for session to delete |                                                         |
-| opts  | `nil\|resession.DeleteOpts` |                                               |                                                         |
-|       | dir                         | `nil\|string`                                 | Name of directory to delete from (overrides config.dir) |
+| Param   | Type                        | Desc                                                    |
+| ------- | --------------------------- | ------------------------------------------------------- |
+| name    | `nil\|string`               | If not provided, prompt for session to delete           |
+| opts    | `nil\|resession.DeleteOpts` |                                                         |
+| >dir    | `nil\|string`               | Name of directory to delete from (overrides config.dir) |
+| >notify | `nil\|boolean`              | Notify on success (default true)                        |
 
 ### save(name, opts)
 
 `save(name, opts)` \
 Save a session to disk
 
-| Param | Type                      | Desc           |                                                      |
-| ----- | ------------------------- | -------------- | ---------------------------------------------------- |
-| name  | `nil\|string`             |                |                                                      |
-| opts  | `nil\|resession.SaveOpts` |                |                                                      |
-|       | attach                    | `nil\|boolean` | Stay attached to session after saving (default true) |
-|       | notify                    | `nil\|boolean` | Notify on success                                    |
-|       | dir                       | `nil\|string`  | Name of directory to save to (overrides config.dir)  |
+| Param   | Type                      | Desc                                                 |
+| ------- | ------------------------- | ---------------------------------------------------- |
+| name    | `nil\|string`             |                                                      |
+| opts    | `nil\|resession.SaveOpts` |                                                      |
+| >attach | `nil\|boolean`            | Stay attached to session after saving (default true) |
+| >notify | `nil\|boolean`            | Notify on success (default true)                     |
+| >dir    | `nil\|string`             | Name of directory to save to (overrides config.dir)  |
 
 ### save_tab(name, opts)
 
 `save_tab(name, opts)` \
 Save a tab-scoped session
 
-| Param | Type                      | Desc                                               |                                                      |
-| ----- | ------------------------- | -------------------------------------------------- | ---------------------------------------------------- |
-| name  | `nil\|string`             | If not provided, will prompt user for session name |                                                      |
-| opts  | `nil\|resession.SaveOpts` |                                                    |                                                      |
-|       | attach                    | `nil\|boolean`                                     | Stay attached to session after saving (default true) |
-|       | notify                    | `nil\|boolean`                                     | Notify on success                                    |
-|       | dir                       | `nil\|string`                                      | Name of directory to save to (overrides config.dir)  |
+| Param   | Type                      | Desc                                                 |
+| ------- | ------------------------- | ---------------------------------------------------- |
+| name    | `nil\|string`             | If not provided, will prompt user for session name   |
+| opts    | `nil\|resession.SaveOpts` |                                                      |
+| >attach | `nil\|boolean`            | Stay attached to session after saving (default true) |
+| >notify | `nil\|boolean`            | Notify on success (default true)                     |
+| >dir    | `nil\|string`             | Name of directory to save to (overrides config.dir)  |
 
 ### save_all(opts)
 
 `save_all(opts)` \
 Save all current sessions to disk
 
-| Param | Type                         | Desc           |                   |
-| ----- | ---------------------------- | -------------- | ----------------- |
-| opts  | `nil\|resession.SaveAllOpts` |                |                   |
-|       | notify                       | `nil\|boolean` | Notify on success |
+| Param   | Type                         | Desc              |
+| ------- | ---------------------------- | ----------------- |
+| opts    | `nil\|resession.SaveAllOpts` |                   |
+| >notify | `nil\|boolean`               | Notify on success |
 
 ### load(name, opts)
 
 `load(name, opts)` \
 Load a session
 
-| Param | Type                      | Desc                   |                                                              |
-| ----- | ------------------------- | ---------------------- | ------------------------------------------------------------ |
-| name  | `nil\|string`             |                        |                                                              |
-| opts  | `nil\|resession.LoadOpts` |                        |                                                              |
-|       | attach                    | `nil\|boolean`         | Stay attached to session after loading (default true)        |
-|       | reset                     | `nil\|boolean\|"auto"` | Close everything before loading the session (default "auto") |
-|       | silence_errors            | `nil\|boolean`         | Don't error when trying to load a missing session            |
-|       | dir                       | `nil\|string`          | Name of directory to load from (overrides config.dir)        |
+| Param           | Type                      | Desc                                                         |
+| --------------- | ------------------------- | ------------------------------------------------------------ |
+| name            | `nil\|string`             |                                                              |
+| opts            | `nil\|resession.LoadOpts` |                                                              |
+| >attach         | `nil\|boolean`            | Stay attached to session after loading (default true)        |
+| >reset          | `nil\|boolean\|"auto"`    | Close everything before loading the session (default "auto") |
+| >silence_errors | `nil\|boolean`            | Don't error when trying to load a missing session            |
+| >dir            | `nil\|string`             | Name of directory to load from (overrides config.dir)        |
 
 **Note:**
 <pre>
@@ -518,9 +525,10 @@ Returns true if a session is currently being loaded
 ## Extensions
 
 - [quickfix](lua/resession/extensions/quickfix.lua) (built-in)
+- [colorscheme](lua/resession/extensions/colorscheme.lua) (built-in)
 - [aerial.nvim](https://github.com/stevearc/aerial.nvim)
 - [overseer.nvim](https://github.com/stevearc/overseer.nvim)
-- [telescope-resession.nvim](https://github.com/scottmckendry/telescope-resession.nvim) - alternative save/load UI
+- [pick-resession.nvim](https://github.com/scottmckendry/pick-resession.nvim) - alternative save/load UI
 
 ## FAQ
 
